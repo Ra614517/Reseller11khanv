@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>KHANG VIP - Reseller Panel</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <style>
+    :root { --primary: #f72585; --secondary: #4cc9f0; --accent: #4361ee; --bg-dark: #0f0f1a; --glass: rgba(255, 255, 255, 0.03); --glass-border: rgba(255, 255, 255, 0.1); }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+    body { min-height: 100vh; background: var(--bg-dark); color: white; padding: 10px; }
+    body::before { content: ""; position: fixed; top: -10%; left: -10%; width: 250px; height: 250px; background: var(--primary); filter: blur(100px); opacity: 0.15; z-index: -1; }
+    
+    .header { background: var(--glass); backdrop-filter: blur(15px); border: 1px solid var(--glass-border); padding: 12px 15px; border-radius: 15px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; position: sticky; top: 5px; z-index: 100; }
+    .khang-logo { font-weight: 800; font-size: 18px; }
+    .khang-logo span { color: var(--primary); }
+    .credit-box { background: rgba(255, 255, 255, 0.05); padding: 5px 12px; border-radius: 10px; border: 1px solid var(--secondary); font-weight: 600; font-size: 13px; color: var(--secondary); }
+
+    .container { width: 100%; max-width: 800px; margin: 0 auto; }
+    .card { background: var(--glass); backdrop-filter: blur(15px); border: 1px solid var(--glass-border); border-radius: 20px; padding: 20px; margin-bottom: 20px; }
+    h3 { font-size: 15px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; color: #ddd; }
+    
+    input, select { width: 100%; padding: 12px; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); border-radius: 12px; color: white; margin-bottom: 12px; outline: none; font-size: 14px; }
+    .btn-add { width: 100%; padding: 14px; border-radius: 12px; border: none; background: linear-gradient(45deg, var(--primary), var(--accent)); color: white; font-weight: 700; cursor: pointer; font-size: 14px; }
+
+    .table-responsive { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 450px; }
+    th { text-align: left; padding: 12px; font-size: 12px; color: var(--secondary); border-bottom: 1px solid var(--glass-border); }
+    td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; }
+    .btn-icon { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--glass-border); background: none; color: white; cursor: pointer; margin-right: 5px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="khang-logo"><span>KHANG</span> VIP</div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span id="currentReseller" style="font-size: 11px; color: #888;"></span>
+      <span class="credit-box"><i class="fas fa-coins"></i> <span id="myCredits">0</span></span>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <h3><i class="fas fa-user-plus"></i> Create Key</h3>
+      <form id="addUserForm">
+        <input type="text" id="uName" placeholder="Username" required>
+        <input type="text" id="uPass" placeholder="Password" required>
+        <select id="uPlan" required>
+          <option value="10,1">10 Days - 1 Credit</option>
+          <option value="20,2">20 Days - 2 Credits</option>
+          <option value="30,3">30 Days - 3 Credits</option>
+        </select>
+        <button type="submit" class="btn-add">GENERATE ACCOUNT</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3><i class="fas fa-users"></i> Users List</h3>
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>USER/PASS</th><th>EXPIRY</th><th>ACTION</th></tr></thead>
+          <tbody id="userTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { db } from "./firebase-config.js";
+    import { ref, set, get, update, onValue, remove } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-database.js";
+
+    const resID = localStorage.getItem("resellerID");
+    if (!resID) window.location.href = "login.html";
+    document.getElementById('currentReseller').innerText = resID;
+
+    const resRef = ref(db, `resellers/${resID}`);
+    onValue(resRef, snap => { if(snap.exists()) document.getElementById('myCredits').innerText = snap.val().credits || 0; });
+
+    document.getElementById('addUserForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const u = document.getElementById('uName').value.trim();
+      const p = document.getElementById('uPass').value.trim();
+      const [days, cost] = document.getElementById('uPlan').value.split(',').map(Number);
+
+      const rSnap = await get(resRef);
+      if ((rSnap.val().credits || 0) < cost) return Swal.fire('Error', 'No Credits!', 'error');
+
+      const uRef = ref(db, `userinfo/${u}`);
+      if((await get(uRef)).exists()) return Swal.fire('Error', 'Exists!', 'warning');
+
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      const validity = `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+
+      await set(uRef, { username:u, password:p, status:'active', validity, owner:resID });
+      await update(resRef, { credits: rSnap.val().credits - cost });
+      Swal.fire('Success', 'Created!', 'success');
+      e.target.reset();
+    };
+
+    onValue(ref(db, 'userinfo'), snap => {
+      const tbody = document.getElementById('userTableBody');
+      tbody.innerHTML = '';
+      if(snap.exists()) {
+        Object.entries(snap.val()).forEach(([key, user]) => {
+          if (user.owner === resID) {
+            tbody.innerHTML += `<tr><td><b>${key}</b><br><small>${user.password}</small></td><td>${user.validity}</td><td><button onclick="delUser('${key}')" class="btn-icon"><i class="fas fa-trash"></i></button></td></tr>`;
+          }
+        });
+      }
+    });
+
+    window.delUser = (u) => { if(confirm("Delete?")) remove(ref(db, `userinfo/${u}`)); };
+  </script>
+</body>
+</html>
