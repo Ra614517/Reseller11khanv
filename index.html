@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>KHANG VIP - Reseller Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <style>
+    :root { --primary: #f72585; --secondary: #4cc9f0; --accent: #4361ee; }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+
+    body {
+      height: 100vh; display: flex; justify-content: center; align-items: center;
+      background: #0f0f1a; overflow: hidden; color: white; padding: 20px;
+    }
+
+    .bg-circle { position: absolute; border-radius: 50%; filter: blur(80px); z-index: -1; animation: float 10s infinite alternate; }
+    .c1 { width: 250px; height: 250px; background: var(--primary); top: -5%; left: -5%; opacity: 0.3; }
+    .c2 { width: 200px; height: 200px; background: var(--secondary); bottom: -5%; right: -5%; opacity: 0.2; }
+    @keyframes float { 0% { transform: translate(0,0); } 100% { transform: translate(20px, 40px); } }
+
+    .login-card {
+      width: 100%; max-width: 380px; padding: 40px 25px;
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border-radius: 25px; border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5); text-align: center;
+    }
+
+    .khang-logo { font-size: 26px; font-weight: 800; margin-bottom: 25px; }
+    .khang-logo span { color: var(--primary); } .khang-logo b { color: var(--secondary); }
+
+    .input-box { position: relative; margin-bottom: 20px; }
+    .input-box i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #888; }
+    .input-box input {
+      width: 100%; padding: 12px 20px 12px 45px; background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;
+      color: white; outline: none; transition: 0.3s; font-size: 14px;
+    }
+    .input-box input:focus { border-color: var(--secondary); }
+
+    .options { display: flex; justify-content: flex-start; align-items: center; font-size: 13px; margin-bottom: 25px; color: #aaa; }
+    .options label { cursor: pointer; display: flex; align-items: center; gap: 8px; }
+
+    .btn-login {
+      width: 100%; padding: 14px; border-radius: 12px; border: none;
+      background: linear-gradient(45deg, var(--primary), var(--accent));
+      color: white; font-weight: 700; cursor: pointer; transition: 0.3s;
+      text-transform: uppercase; letter-spacing: 1px; font-size: 14px;
+    }
+    .btn-login:active { transform: scale(0.98); }
+
+    .grp-link { margin-top: 25px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); }
+    .grp-link a { color: var(--secondary); text-decoration: none; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  </style>
+</head>
+<body>
+  <div class="bg-circle c1"></div>
+  <div class="bg-circle c2"></div>
+  <div class="login-card">
+    <div class="khang-logo"><span>KHANG</span> <b>VIP</b></div>
+    <div class="input-box">
+      <i class="fas fa-user"></i>
+      <input type="text" id="resUser" placeholder="Username">
+    </div>
+    <div class="input-box">
+      <i class="fas fa-lock"></i>
+      <input type="password" id="resPass" placeholder="Password">
+    </div>
+    <div class="options">
+      <label><input type="checkbox" id="rememberMe"> Remember Login</label>
+    </div>
+    <button onclick="handleLogin()" class="btn-login">LOGIN NOW</button>
+    <div class="grp-link">
+      <a href="https://t.me/your_link" target="_blank"><i class="fab fa-telegram"></i> JOIN TELEGRAM GROUP</a>
+    </div>
+  </div>
+
+  <script type="module">
+    import { db } from "./firebase-config.js";
+    import { ref, get, update } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-database.js";
+
+    window.onload = () => {
+      const u = localStorage.getItem("rememberedUser");
+      const p = localStorage.getItem("rememberedPass");
+      if(u && p) {
+        document.getElementById('resUser').value = u;
+        document.getElementById('resPass').value = p;
+        document.getElementById('rememberMe').checked = true;
+      }
+    };
+
+    window.handleLogin = async () => {
+      const user = document.getElementById('resUser').value.trim();
+      const pass = document.getElementById('resPass').value.trim();
+      const remember = document.getElementById('rememberMe').checked;
+
+      if(!user || !pass) return Swal.fire({ icon: 'warning', text: 'Fill all fields!', toast: true, position: 'top', showConfirmButton: false, timer: 2000 });
+
+      Swal.fire({ title: 'Verifying...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+      try {
+        const resRef = ref(db, `resellers/${user}`);
+        const snapshot = await get(resRef);
+
+        if (snapshot.exists()) {
+          const resData = snapshot.val();
+          
+          if (String(resData.password) === String(pass)) {
+            
+            // Generate or Get Unique Browser ID
+            let browserID = localStorage.getItem("browserID") || "DEV-" + Math.random().toString(36).substring(2, 12);
+            localStorage.setItem("browserID", browserID);
+
+            // Device Lock Logic
+            if (!resData.deviceID || resData.deviceID === "null") {
+              // Lock device on first login
+              await update(resRef, { deviceID: browserID });
+            } else if (resData.deviceID !== browserID) {
+              // Stop if login from another device
+              return Swal.fire({ icon: 'error', title: 'Device Lock', text: 'Account locked to another device!' });
+            }
+
+            if(remember) { 
+                localStorage.setItem("rememberedUser", user); 
+                localStorage.setItem("rememberedPass", pass); 
+            } else { 
+                localStorage.removeItem("rememberedUser"); 
+                localStorage.removeItem("rememberedPass"); 
+            }
+
+            localStorage.setItem("resellerID", user);
+            window.location.href = "reseller-panel.html";
+
+          } else {
+            Swal.fire({ icon: 'error', text: 'Invalid Password!' });
+          }
+        } else {
+          Swal.fire({ icon: 'error', text: 'Reseller not found!' });
+        }
+      } catch (e) {
+        Swal.fire({ icon: 'error', text: 'Database connection error!' });
+      }
+    };
+  </script>
+</body>
+</html>
